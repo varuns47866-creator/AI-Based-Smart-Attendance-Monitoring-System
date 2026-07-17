@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  db:
+    image: ankane/pgvector:latest
+    container_name: attendance_postgres
+    restart: always
+    environment:
+      POSTGRES_DB: attendance_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: supersecure_db_pass_123
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d attendance_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: attendance_backend
+    restart: always
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://postgres:supersecure_db_pass_123@db:5432/attendance_db
+      - ENV=production
+      - JWT_SECRET=CHANGE_THIS_IN_PROD_987654321_ABC
+      - USE_SIMULATED_CAMERA=False
+    ports:
+      - "8000:8000"
+    volumes:
+      - backend_storage:/workspace/storage
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: attendance_frontend
+    restart: always
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
+  backend_storage:
